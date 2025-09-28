@@ -17,7 +17,40 @@ def load_dataframe():
 		raise FileNotFoundError(f"Data file not found: {FILE_PATH}")
 	# The file is CSV with a header; let pandas infer types
 	df = pd.read_csv(FILE_PATH, parse_dates=["Date"], infer_datetime_format=True)
+
+	# Remove the OpenInt column if present (second-commit change)
+	if "OpenInt" in df.columns:
+		df = df.drop(columns=["OpenInt"])
+
+	# Ensure Date is datetime and sorted
+	df["Date"] = pd.to_datetime(df["Date"]) 
+	df = df.sort_values("Date").reset_index(drop=True)
+
 	return df
+
+
+def split_into_three(df):
+	"""Split the dataframe into three time-based partitions.
+
+	The split is based on equal thirds of the time span between the
+	minimum and maximum dates in `df`.
+
+	Returns (part1, part2, part3) as DataFrame objects.
+	"""
+	if df is None or df.empty:
+		return None, None, None
+
+	start = df["Date"].min()
+	end = df["Date"].max()
+	total = end - start
+	cut1 = start + total / 3
+	cut2 = start + 2 * total / 3
+
+	part1 = df[df["Date"] <= cut1].copy().reset_index(drop=True)
+	part2 = df[(df["Date"] > cut1) & (df["Date"] <= cut2)].copy().reset_index(drop=True)
+	part3 = df[df["Date"] > cut2].copy().reset_index(drop=True)
+
+	return part1, part2, part3
 
 
 @app.route("/")

@@ -1,4 +1,4 @@
-# TRG Week 42
+# TRG Week 43
 
 ## $DIS (Disney)
 
@@ -11,6 +11,8 @@
 - Flask API added: serves `dis.us.txt` as an HTML table at `/data` (see `app/data.py`).
 
 ### 2nd Commit
+
+- Removed `OpenInt` column and split the dataset into three time-based DataFrames for further analysis (see `app/data.py`).
 
 ### 3rd Commit
 
