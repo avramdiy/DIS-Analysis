@@ -20,4 +20,6 @@
 
 ### 4th Commit
 
+- Added `/ma180` route that computes and visualizes the 180-day moving average of Close for each of the three partitions (PNG plot or `?show=json`).
+
 ### 5th Commit

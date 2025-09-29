@@ -72,6 +72,21 @@ def quarterly_returns(df):
 	return q
 
 
+def ma180(df):
+	"""Compute 180-day moving average of the 'Close' price.
+
+	Uses a time-based window so it handles irregular trading days.
+	Returns a Series indexed by Date with the moving average (drops NaNs).
+	"""
+	if df is None or df.empty:
+		return pd.Series(dtype=float)
+
+	s = df.set_index('Date')['Close'].sort_index()
+	# 180 calendar-day window; min_periods=1 to allow early values if desired
+	ma = s.rolling('180D', min_periods=1).mean()
+	return ma.dropna()
+
+
 @app.route("/")
 def index():
 	"""Simple index pointing to the data endpoint."""
@@ -154,6 +169,53 @@ def dividends_plot():
 			'part1': q1.round(6).to_dict(),
 			'part2': q2.round(6).to_dict(),
 			'part3': q3.round(6).to_dict(),
+		}
+		return out
+
+	return Response(buf.getvalue(), content_type='image/png')
+
+
+@app.route('/ma180')
+def ma180_plot():
+	"""Compute 180-day moving averages for each partition and return PNG.
+
+	Optional `?show=json` returns numeric series for each part.
+	"""
+	try:
+		df = load_dataframe()
+	except FileNotFoundError:
+		abort(404, description="Data file not found on server")
+
+	p1, p2, p3 = split_into_three(df)
+
+	m1 = ma180(p1)
+	m2 = ma180(p2)
+	m3 = ma180(p3)
+
+	fig, ax = plt.subplots(figsize=(10, 5))
+	if not m1.empty:
+		ax.plot(m1.index, m1.values, label='Part 1')
+	if not m2.empty:
+		ax.plot(m2.index, m2.values, label='Part 2')
+	if not m3.empty:
+		ax.plot(m3.index, m3.values, label='Part 3')
+
+	ax.set_title('180-day Moving Average (Close price) for 3 partitions')
+	ax.set_ylabel('180-day MA')
+	ax.legend()
+
+	buf = io.BytesIO()
+	fig.tight_layout()
+	fig.savefig(buf, format='png')
+	plt.close(fig)
+	buf.seek(0)
+
+	show = request.args.get('show', 'png').lower()
+	if show == 'json':
+		out = {
+			'part1': m1.round(6).to_dict(),
+			'part2': m2.round(6).to_dict(),
+			'part3': m3.round(6).to_dict(),
 		}
 		return out
 
