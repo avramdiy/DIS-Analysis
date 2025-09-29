@@ -23,3 +23,5 @@
 - Added `/ma180` route that computes and visualizes the 180-day moving average of Close for each of the three partitions (PNG plot or `?show=json`).
 
 ### 5th Commit
+
+- Added `/vol180` route that computes and visualizes the 180-day rolling (annualized) volatility of daily returns for each partition (PNG plot or `?show=json`).

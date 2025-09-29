@@ -87,6 +87,24 @@ def ma180(df):
 	return ma.dropna()
 
 
+def vol180(df, annualize=True):
+	"""Compute 180-day rolling volatility of daily returns.
+
+	Returns a Series indexed by Date. If annualize=True, multiplies by sqrt(252).
+	Uses time-based rolling window of 180 calendar days.
+	"""
+	if df is None or df.empty:
+		return pd.Series(dtype=float)
+
+	s = df.set_index('Date')['Close'].sort_index()
+	daily_ret = s.pct_change().dropna()
+	# rolling std over 180 calendar days
+	vol = daily_ret.rolling('180D', min_periods=1).std()
+	if annualize:
+		vol = vol * (252 ** 0.5)
+	return vol.dropna()
+
+
 @app.route("/")
 def index():
 	"""Simple index pointing to the data endpoint."""
@@ -169,6 +187,53 @@ def dividends_plot():
 			'part1': q1.round(6).to_dict(),
 			'part2': q2.round(6).to_dict(),
 			'part3': q3.round(6).to_dict(),
+		}
+		return out
+
+	return Response(buf.getvalue(), content_type='image/png')
+
+
+@app.route('/vol180')
+def vol180_plot():
+	"""Compute 180-day rolling volatility for each partition and return PNG.
+
+	Optional `?show=json` returns numeric series for each part.
+	"""
+	try:
+		df = load_dataframe()
+	except FileNotFoundError:
+		abort(404, description="Data file not found on server")
+
+	p1, p2, p3 = split_into_three(df)
+
+	v1 = vol180(p1)
+	v2 = vol180(p2)
+	v3 = vol180(p3)
+
+	fig, ax = plt.subplots(figsize=(10, 5))
+	if not v1.empty:
+		ax.plot(v1.index, v1.values, label='Part 1')
+	if not v2.empty:
+		ax.plot(v2.index, v2.values, label='Part 2')
+	if not v3.empty:
+		ax.plot(v3.index, v3.values, label='Part 3')
+
+	ax.set_title('180-day Rolling Volatility (annualized) for 3 partitions')
+	ax.set_ylabel('Volatility (annualized)')
+	ax.legend()
+
+	buf = io.BytesIO()
+	fig.tight_layout()
+	fig.savefig(buf, format='png')
+	plt.close(fig)
+	buf.seek(0)
+
+	show = request.args.get('show', 'png').lower()
+	if show == 'json':
+		out = {
+			'part1': v1.round(6).to_dict(),
+			'part2': v2.round(6).to_dict(),
+			'part3': v3.round(6).to_dict(),
 		}
 		return out
 
