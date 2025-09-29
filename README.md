@@ -16,6 +16,8 @@
 
 ### 3rd Commit
 
+- Added `/dividends` route that computes quarterly percent returns (Close price) for each of the three partitions and returns a PNG visualization (or JSON via `?show=json`).
+
 ### 4th Commit
 
 ### 5th Commit

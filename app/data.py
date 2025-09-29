@@ -1,6 +1,10 @@
 from flask import Flask, Response, request, abort
 import pandas as pd
 import os
+import io
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 # Absolute path to the data file
 FILE_PATH = r"C:\Users\avram\OneDrive\Desktop\Bloomtech TRG\TRG Week 43\dis.us.txt"
@@ -53,6 +57,21 @@ def split_into_three(df):
 	return part1, part2, part3
 
 
+def quarterly_returns(df):
+	"""Compute quarterly percent returns based on 'Close' column.
+
+	Note: the dataset does not contain explicit dividend payments. This
+	function computes quarterly percentage change of the Close price
+	(as a proxy for quarterly earnings/returns). If you have a 'Dividends'
+	column later, replace this logic accordingly.
+	"""
+	if df is None or df.empty:
+		return pd.Series(dtype=float)
+
+	q = df.set_index('Date').resample('Q')['Close'].last().pct_change().dropna()
+	return q
+
+
 @app.route("/")
 def index():
 	"""Simple index pointing to the data endpoint."""
@@ -89,6 +108,56 @@ def data_table():
 @app.route("/health")
 def health():
 	return {"status": "ok"}
+
+
+@app.route("/dividends")
+def dividends_plot():
+	"""Compute quarterly returns for each partition and return a PNG plot.
+
+	Optional query param `show` accepts 'png' (default) or 'json'.
+	"""
+	try:
+		df = load_dataframe()
+	except FileNotFoundError:
+		abort(404, description="Data file not found on server")
+
+	p1, p2, p3 = split_into_three(df)
+
+	q1 = quarterly_returns(p1)
+	q2 = quarterly_returns(p2)
+	q3 = quarterly_returns(p3)
+
+	# Create plot
+	fig, ax = plt.subplots(figsize=(10, 5))
+	if not q1.empty:
+		ax.plot(q1.index, q1.values, label='Part 1')
+	if not q2.empty:
+		ax.plot(q2.index, q2.values, label='Part 2')
+	if not q3.empty:
+		ax.plot(q3.index, q3.values, label='Part 3')
+
+	ax.axhline(0, color='gray', linewidth=0.5)
+	ax.set_title('Quarterly Percent Returns (Close price) for 3 partitions')
+	ax.set_ylabel('Quarterly pct change')
+	ax.legend()
+
+	buf = io.BytesIO()
+	fig.tight_layout()
+	fig.savefig(buf, format='png')
+	plt.close(fig)
+	buf.seek(0)
+
+	show = request.args.get('show', 'png').lower()
+	if show == 'json':
+		# Return numeric data as JSON
+		out = {
+			'part1': q1.round(6).to_dict(),
+			'part2': q2.round(6).to_dict(),
+			'part3': q3.round(6).to_dict(),
+		}
+		return out
+
+	return Response(buf.getvalue(), content_type='image/png')
 
 
 if __name__ == "__main__":
